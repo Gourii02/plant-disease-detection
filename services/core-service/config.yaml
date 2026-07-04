@@ -1,0 +1,12 @@
+SERVER_PORT: "8080"
+DB_HOST: "localhost"
+DB_PORT: "5432"
+DB_USER: "postgres"
+DB_PASSWORD: "postgres"
+DB_NAME: "plant_disease_db"
+DB_SSLMODE: "disable"
+REDIS_HOST: "localhost"
+REDIS_PORT: "6379"
+REDIS_PASSWORD: ""
+JWT_SECRET: "your_development_secret_signing_key_keep_it_secure"
+JWT_EXPIRY_MINUTES: 15

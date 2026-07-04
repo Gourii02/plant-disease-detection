@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: plant-disease-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: plant_disease_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d plant_disease_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: plant-disease-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: plant-disease-mq
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Management portal interface
+
+  core-service:
+    build:
+      context: ./services/core-service
+      dockerfile: Dockerfile
+    container_name: plant-core-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=plant_disease_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=development_secret_signing_key_keep_it_secure_1298408124
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: plant-ai-service
+    ports:
+      - "8000:8000"
+    environment:
+      - API_PORT=8000
+      - TRITON_SERVER_URL=triton:8001
+    depends_on:
+      - rabbitmq
+
+  celery-worker:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: plant-celery-worker
+    entrypoint: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=info"]
+    environment:
+      - RABBITMQ_BROKER_URL=pyamqp://guest:guest@rabbitmq:5672//
+      - TRITON_SERVER_URL=triton:8001
+    depends_on:
+      - rabbitmq
+
+volumes:
+  pgdata:
+  redisdata:
