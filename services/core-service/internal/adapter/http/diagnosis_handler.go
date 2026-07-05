@@ -23,7 +23,7 @@ func (h *DiagnosisHandler) Initiate(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized context"})
 		return
 	}
-	userID := val.(uuid.UUID)
+	userID := val.(uint)
 
 	var req usecase.CreateDiagnosisRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -60,7 +60,7 @@ func (h *DiagnosisHandler) GetByID(c *gin.Context) {
 
 	// Verify resource ownership
 	val, exists := c.Get("userID")
-	if !exists || val.(uuid.UUID) != diag.UserID {
+	if !exists || val.(uint) != diag.UserID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: resource belongs to a different account"})
 		return
 	}
@@ -74,7 +74,7 @@ func (h *DiagnosisHandler) GetHistory(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized context"})
 		return
 	}
-	userID := val.(uuid.UUID)
+	userID := val.(uint)
 
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")

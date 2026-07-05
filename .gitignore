@@ -116,3 +116,13 @@ models/
 logs/
 uploads/
 temp/
+
+# Go service — local config with secrets (use config.example.yaml instead)
+services/core-service/config.yaml
+
+# Secret file naming conventions
+*.local.yaml
+*.secret.yaml
+
+# OS — Windows specific
+$RECYCLE.BIN/

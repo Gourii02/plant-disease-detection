@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
 	"github.com/plant-disease-detection/core-service/internal/domain"
 	"gorm.io/gorm"
 )
@@ -33,7 +32,7 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 	return &user, nil
 }
 
-func (r *userRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+func (r *userRepo) GetByID(ctx context.Context, id uint) (*domain.User, error) {
 	var user domain.User
 	err := r.db.WithContext(ctx).First(&user, "id = ?", id).Error
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -19,13 +18,13 @@ var upgrader = websocket.Upgrader{
 }
 
 type Client struct {
-	UserID uuid.UUID
+	UserID uint
 	Conn   *websocket.Conn
 	Send   chan []byte
 }
 
 type WsHub struct {
-	clients    map[uuid.UUID]map[*Client]bool
+	clients    map[uint]map[*Client]bool
 	broadcast  chan BroadcastMessage
 	register   chan *Client
 	unregister chan *Client
@@ -33,13 +32,13 @@ type WsHub struct {
 }
 
 type BroadcastMessage struct {
-	UserID  uuid.UUID `json:"user_id"`
-	Payload []byte    `json:"payload"`
+	UserID  uint   `json:"user_id"`
+	Payload []byte `json:"payload"`
 }
 
 func NewWsHub() *WsHub {
 	return &WsHub{
-		clients:    make(map[uuid.UUID]map[*Client]bool),
+		clients:    make(map[uint]map[*Client]bool),
 		broadcast:  make(chan BroadcastMessage),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
@@ -56,7 +55,7 @@ func (h *WsHub) Run() {
 			}
 			h.clients[client.UserID][client] = true
 			h.mu.Unlock()
-			log.Printf("WebSocket client registered for User: %s", client.UserID)
+			log.Printf("WebSocket client registered for User: %d", client.UserID)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -66,7 +65,7 @@ func (h *WsHub) Run() {
 				if len(h.clients[client.UserID]) == 0 {
 					delete(h.clients, client.UserID)
 				}
-				log.Printf("WebSocket client unregistered for User: %s", client.UserID)
+				log.Printf("WebSocket client unregistered for User: %d", client.UserID)
 			}
 			h.mu.Unlock()
 
@@ -89,14 +88,14 @@ func (h *WsHub) Run() {
 	}
 }
 
-func (h *WsHub) BroadcastToUser(userID uuid.UUID, message []byte) {
+func (h *WsHub) BroadcastToUser(userID uint, message []byte) {
 	h.broadcast <- BroadcastMessage{
 		UserID:  userID,
 		Payload: message,
 	}
 }
 
-func (h *WsHub) ServeWs(c *gin.Context, userID uuid.UUID) {
+func (h *WsHub) ServeWs(c *gin.Context, userID uint) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("WebSocket Upgrade Error: %v", err)

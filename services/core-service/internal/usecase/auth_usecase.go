@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/plant-disease-detection/core-service/internal/auth"
 	"github.com/plant-disease-detection/core-service/internal/domain"
 	"golang.org/x/crypto/bcrypt"
@@ -60,7 +59,6 @@ func (u *authUsecase) Register(ctx context.Context, req RegisterRequest) (*AuthR
 	}
 
 	newUser := &domain.User{
-		ID:           uuid.New(),
 		Email:        req.Email,
 		PasswordHash: string(hashed),
 		CreatedAt:    time.Now(),

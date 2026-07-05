@@ -17,7 +17,7 @@ const (
 
 type Diagnosis struct {
 	ID             uuid.UUID       `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	UserID         uuid.UUID       `json:"user_id" gorm:"type:uuid;index;not null"`
+	UserID         uint            `json:"user_id" gorm:"type:integer;index;not null"`
 	SpeciesLabel   string          `json:"species_label" gorm:"type:varchar(100)"`
 	DiseaseLabel   string          `json:"disease_label" gorm:"type:varchar(100)"`
 	Confidence     float64         `json:"confidence" gorm:"type:float8"`
@@ -33,5 +33,5 @@ type DiagnosisRepository interface {
 	Create(ctx context.Context, diag *Diagnosis) error
 	Update(ctx context.Context, diag *Diagnosis) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Diagnosis, error)
-	GetByUserID(ctx context.Context, userID uuid.UUID, limit int, offset int) ([]Diagnosis, error)
+	GetByUserID(ctx context.Context, userID uint, limit int, offset int) ([]Diagnosis, error)
 }

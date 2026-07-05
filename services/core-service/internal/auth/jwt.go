@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/plant-disease-detection/core-service/internal/config"
 )
 
 type JWTService interface {
-	GenerateToken(userID uuid.UUID) (string, error)
-	ValidateToken(tokenString string) (uuid.UUID, error)
+	GenerateToken(userID uint) (string, error)
+	ValidateToken(tokenString string) (uint, error)
 }
 
 type jwtService struct {
@@ -21,7 +20,7 @@ type jwtService struct {
 }
 
 type Claims struct {
-	UserID string `json:"user_id"`
+	UserID uint `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
@@ -32,9 +31,9 @@ func NewJWTService(cfg *config.Config) JWTService {
 	}
 }
 
-func (s *jwtService) GenerateToken(userID uuid.UUID) (string, error) {
+func (s *jwtService) GenerateToken(userID uint) (string, error) {
 	claims := &Claims{
-		UserID: userID.String(),
+		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -45,7 +44,7 @@ func (s *jwtService) GenerateToken(userID uuid.UUID) (string, error) {
 	return token.SignedString(s.secretKey)
 }
 
-func (s *jwtService) ValidateToken(tokenString string) (uuid.UUID, error) {
+func (s *jwtService) ValidateToken(tokenString string) (uint, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -54,18 +53,13 @@ func (s *jwtService) ValidateToken(tokenString string) (uuid.UUID, error) {
 	})
 
 	if err != nil {
-		return uuid.Nil, err
+		return 0, err
 	}
 
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
-		return uuid.Nil, errors.New("invalid signature token claims")
+		return 0, errors.New("invalid signature token claims")
 	}
 
-	parsedID, err := uuid.Parse(claims.UserID)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("invalid uuid format in claims: %w", err)
-	}
-
-	return parsedID, nil
+	return claims.UserID, nil
 }

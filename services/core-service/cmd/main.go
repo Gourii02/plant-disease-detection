@@ -49,6 +49,7 @@ func main() {
 
 	// 7. Setup Router & Start Server
 	router := http.SetupRouter(http.RouterConfig{
+		DB:               gormDB,
 		AuthHandler:      authHandler,
 		TreatmentHandler: treatHandler,
 		DiagnosisHandler: diagHandler,

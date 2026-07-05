@@ -16,8 +16,8 @@ type CreateDiagnosisRequest struct {
 
 type DiagnosisUsecase interface {
 	GetDiagnosis(ctx context.Context, id uuid.UUID) (*domain.Diagnosis, error)
-	GetHistory(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.Diagnosis, error)
-	InitiateDiagnosis(ctx context.Context, userID uuid.UUID, req CreateDiagnosisRequest) (*domain.Diagnosis, error)
+	GetHistory(ctx context.Context, userID uint, limit, offset int) ([]domain.Diagnosis, error)
+	InitiateDiagnosis(ctx context.Context, userID uint, req CreateDiagnosisRequest) (*domain.Diagnosis, error)
 }
 
 type diagnosisUsecase struct {
@@ -32,7 +32,7 @@ func (u *diagnosisUsecase) GetDiagnosis(ctx context.Context, id uuid.UUID) (*dom
 	return u.repo.GetByID(ctx, id)
 }
 
-func (u *diagnosisUsecase) GetHistory(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.Diagnosis, error) {
+func (u *diagnosisUsecase) GetHistory(ctx context.Context, userID uint, limit, offset int) ([]domain.Diagnosis, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -42,7 +42,7 @@ func (u *diagnosisUsecase) GetHistory(ctx context.Context, userID uuid.UUID, lim
 	return u.repo.GetByUserID(ctx, userID, limit, offset)
 }
 
-func (u *diagnosisUsecase) InitiateDiagnosis(ctx context.Context, userID uuid.UUID, req CreateDiagnosisRequest) (*domain.Diagnosis, error) {
+func (u *diagnosisUsecase) InitiateDiagnosis(ctx context.Context, userID uint, req CreateDiagnosisRequest) (*domain.Diagnosis, error) {
 	diag := &domain.Diagnosis{
 		ID:        uuid.New(),
 		UserID:    userID,

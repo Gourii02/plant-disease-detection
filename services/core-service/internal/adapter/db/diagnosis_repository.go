@@ -37,7 +37,7 @@ func (r *diagnosisRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Diag
 	return &diag, nil
 }
 
-func (r *diagnosisRepo) GetByUserID(ctx context.Context, userID uuid.UUID, limit int, offset int) ([]domain.Diagnosis, error) {
+func (r *diagnosisRepo) GetByUserID(ctx context.Context, userID uint, limit int, offset int) ([]domain.Diagnosis, error) {
 	var diags []domain.Diagnosis
 	err := r.db.WithContext(ctx).
 		Where("user_id = ?", userID).
