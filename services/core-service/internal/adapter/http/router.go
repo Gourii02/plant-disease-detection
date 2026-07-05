@@ -91,6 +91,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		private.Use(AuthMiddleware(cfg.JWTService))
 		{
 			private.POST("/diagnose", cfg.DiagnosisHandler.Initiate)
+			private.POST("/diagnose/upload", cfg.DiagnosisHandler.UploadAndDiagnose)
 			private.GET("/diagnose/:id", cfg.DiagnosisHandler.GetByID)
 			private.GET("/history", cfg.DiagnosisHandler.GetHistory)
 			

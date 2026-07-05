@@ -1,171 +1,139 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 
 const API_BASE = 'http://localhost:8080/api/v1';
 const WS_BASE = 'ws://localhost:8080/api/v1';
 
-// Preset test images representing plant diseases to make local testing simple and visual.
-const PRESETS = [
-  {
-    id: 1,
-    name: 'Tomato (Early Blight)',
-    url: 'https://images.unsplash.com/photo-1592417817098-8f3d6eb19675?auto=format&fit=crop&w=600&q=80',
-    latitude: 12.9716,
-    longitude: 77.5946
-  },
-  {
-    id: 2,
-    name: 'Potato (Late Blight)',
-    url: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=600&q=80',
-    latitude: 13.0827,
-    longitude: 80.2707
-  },
-  {
-    id: 3,
-    name: 'Healthy Leaf (Control)',
-    url: 'https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?auto=format&fit=crop&w=600&q=80',
-    latitude: 19.0760,
-    longitude: 72.8777
-  }
-];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function ConfidenceBar({ value, isTop }) {
+  return (
+    <div style={{ width: '100%', backgroundColor: 'var(--bg-secondary)', borderRadius: '100px', height: '6px', overflow: 'hidden' }}>
+      <div style={{
+        height: '100%',
+        width: `${value}%`,
+        borderRadius: '100px',
+        background: isTop
+          ? 'linear-gradient(90deg, hsl(142, 70%, 40%), hsl(162, 70%, 50%))'
+          : 'hsla(142, 50%, 45%, 0.5)',
+        transition: 'width 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+      }} />
+    </div>
+  );
+}
+
+function DiseaseTag({ isHealthy }) {
+  return (
+    <span style={{
+      fontSize: '0.7rem',
+      fontWeight: 700,
+      padding: '3px 10px',
+      borderRadius: '100px',
+      backgroundColor: isHealthy ? 'var(--success-bg)' : 'var(--danger-bg)',
+      color: isHealthy ? 'var(--success-color)' : 'var(--danger-color)',
+      border: `1px solid ${isHealthy ? 'hsla(142,70%,45%,0.25)' : 'var(--danger-border)'}`,
+    }}>
+      {isHealthy ? '✓ Healthy' : '⚠ Diseased'}
+    </span>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
-  const [activeTab, setActiveTab] = useState('login'); // login, signup
-  
-  // Auth Form State
+  const [activeTab, setActiveTab] = useState('login');
+
+  // Auth
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Dashboard State
+  // Upload & Diagnosis
+  const [uploadedFile, setUploadedFile] = useState(null);   // File object
+  const [previewUrl, setPreviewUrl] = useState('');          // Object URL for preview
+  const [isDragging, setIsDragging] = useState(false);
+  const [inferLoading, setInferLoading] = useState(false);
+  const [inferResult, setInferResult] = useState(null);      // AI result payload
+  const [inferError, setInferError] = useState('');
+
+  // History
   const [diagnoseHistory, setDiagnoseHistory] = useState([]);
-  const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
-  const [customImageUrl, setCustomImageUrl] = useState('');
-  const [latitude, setLatitude] = useState(PRESETS[0].latitude);
-  const [longitude, setLongitude] = useState(PRESETS[0].longitude);
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [wsStatus, setWsStatus] = useState('disconnected'); // disconnected, connecting, connected
+  const [wsStatus, setWsStatus] = useState('disconnected');
   const [toastMessage, setToastMessage] = useState('');
 
   const wsRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  // Auto-clear toast
+  // Toast auto-clear
   useEffect(() => {
     if (toastMessage) {
-      const timer = setTimeout(() => setToastMessage(''), 3000);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => setToastMessage(''), 3500);
+      return () => clearTimeout(t);
     }
   }, [toastMessage]);
 
-  // Connect WebSocket when authenticated
-  useEffect(() => {
-    if (!token) {
-      if (wsRef.current) wsRef.current.close();
-      return;
-    }
+  const showToast = (msg) => setToastMessage(msg);
 
-    connectWebSocket();
-
-    return () => {
-      if (wsRef.current) wsRef.current.close();
-    };
-  }, [token]);
-
-  // Fetch history when authenticated
-  useEffect(() => {
-    if (token) {
-      fetchHistory();
-    }
-  }, [token]);
-
-  const showToast = (msg) => {
-    setToastMessage(msg);
-  };
-
-  const connectWebSocket = () => {
+  // WebSocket connection
+  const connectWebSocket = useCallback(() => {
     setWsStatus('connecting');
-    // Using query parameter token authentication supported by updated middleware
-    const wsUrl = `${WS_BASE}/ws?token=${token}`;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(`${WS_BASE}/ws?token=${token}`);
     wsRef.current = ws;
-
-    ws.onopen = () => {
-      setWsStatus('connected');
-      showToast('⚡ WebSocket Connected: Live AI Task Updates Active');
-    };
-
-    ws.onmessage = (event) => {
+    ws.onopen = () => { setWsStatus('connected'); showToast('⚡ Live updates active'); };
+    ws.onmessage = (e) => {
       try {
-        const data = JSON.parse(event.data);
-        showToast(`🔔 Update: ${data.message || 'Diagnosis task updated'}`);
-        // Refresh diagnosis history on receiving live event
+        const data = JSON.parse(e.data);
+        showToast(`🔔 ${data.message || 'Diagnosis updated'}`);
         fetchHistory();
-      } catch (err) {
-        console.error('Error parsing WS message:', err);
-      }
+      } catch { /* ignore */ }
     };
-
     ws.onclose = () => {
       setWsStatus('disconnected');
-      // Attempt reconnect after 5 seconds if authenticated
-      if (token) {
-        setTimeout(connectWebSocket, 5000);
-      }
+      if (token) setTimeout(connectWebSocket, 5000);
     };
+    ws.onerror = () => setWsStatus('disconnected');
+  }, [token]);
 
-    ws.onerror = () => {
-      setWsStatus('disconnected');
-    };
-  };
+  useEffect(() => {
+    if (!token) { wsRef.current?.close(); return; }
+    connectWebSocket();
+    return () => wsRef.current?.close();
+  }, [token]);
+
+  useEffect(() => { if (token) fetchHistory(); }, [token]);
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch(`${API_BASE}/history`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDiagnoseHistory(data || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch diagnosis history:', err);
-    }
+      const res = await fetch(`${API_BASE}/history`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setDiagnoseHistory((await res.json()) || []);
+    } catch { /* silent */ }
   };
+
+  // ─── Auth ────────────────────────────────────────────────────────────────
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
     setAuthLoading(true);
-
     const endpoint = activeTab === 'login' ? '/auth/login' : '/auth/signup';
-    const payload = activeTab === 'login' 
-      ? { email, password } 
-      : { name, email, password };
-
+    const payload = activeTab === 'login' ? { email, password } : { name, email, password };
     try {
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || data.message || 'Authentication failed');
-      }
-
-      // Success
+      if (!res.ok) throw new Error(data.error || data.message || 'Authentication failed');
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user || { name: name || email, email }));
       setToken(data.token);
       setUser(data.user || { name: name || email, email });
-      showToast(activeTab === 'login' ? 'Welcome back!' : 'Account registered successfully!');
+      showToast(activeTab === 'login' ? '🌿 Welcome back!' : '🌱 Account created!');
     } catch (err) {
       setAuthError(err.message);
     } finally {
@@ -176,152 +144,125 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    setToken('');
-    setUser(null);
-    setDiagnoseHistory([]);
-    showToast('Logged out successfully');
+    setToken(''); setUser(null); setDiagnoseHistory([]);
+    setInferResult(null); setUploadedFile(null); setPreviewUrl('');
   };
 
-  const handleDiagnoseSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitLoading(true);
+  // ─── Image Upload Handlers ────────────────────────────────────────────────
 
-    const imageUrl = customImageUrl || selectedPreset.url;
+  const acceptFile = (file) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      showToast('❌ Please upload a JPEG or PNG image.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('❌ Image must be under 10 MB.');
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setUploadedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setInferResult(null);
+    setInferError('');
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    acceptFile(e.dataTransfer.files[0]);
+  };
+
+  const handleFileChange = (e) => acceptFile(e.target.files[0]);
+
+  const handleAnalyze = async () => {
+    if (!uploadedFile) { showToast('Please upload an image first.'); return; }
+    setInferLoading(true);
+    setInferError('');
+    setInferResult(null);
+
+    const formData = new FormData();
+    formData.append('image', uploadedFile);
 
     try {
-      const res = await fetch(`${API_BASE}/diagnose`, {
+      const res = await fetch(`${API_BASE}/diagnose/upload`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          image_url: imageUrl,
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null
-        })
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
-
       const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || 'Submission failed');
+        const msg = data?.detail?.detail || data?.error || 'Analysis failed.';
+        throw new Error(msg);
       }
-
-      showToast('🚀 Diagnosis task submitted successfully!');
-      fetchHistory(); // refresh history immediately
-      setCustomImageUrl('');
+      setInferResult(data.ai_result);
+      showToast('✅ Analysis complete!');
+      fetchHistory();
     } catch (err) {
-      showToast(`❌ Error: ${err.message}`);
+      setInferError(err.message);
+      showToast(`❌ ${err.message}`);
     } finally {
-      setSubmitLoading(false);
+      setInferLoading(false);
     }
   };
 
-  const selectPreset = (preset) => {
-    setSelectedPreset(preset);
-    setLatitude(preset.latitude);
-    setLongitude(preset.longitude);
-    setCustomImageUrl('');
-  };
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <>
       <div className="bg-gradient-effects">
-        <div className="gradient-orb-1"></div>
-        <div className="gradient-orb-2"></div>
+        <div className="gradient-orb-1" />
+        <div className="gradient-orb-2" />
       </div>
 
-      {/* Toast Alert */}
+      {/* Toast */}
       {toastMessage && (
         <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: 'hsl(150, 16%, 10%)',
-          border: '1px solid hsla(142, 70%, 45%, 0.3)',
-          color: 'var(--text-primary)',
-          padding: '12px 24px',
-          borderRadius: '12px',
-          boxShadow: 'var(--shadow-lg)',
-          zIndex: 1000,
-          fontSize: '0.9rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          backdropFilter: 'blur(10px)',
-          animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          backgroundColor: 'hsl(150,16%,10%)', border: '1px solid hsla(142,70%,45%,0.3)',
+          color: 'var(--text-primary)', padding: '12px 24px', borderRadius: '12px',
+          boxShadow: 'var(--shadow-lg)', zIndex: 1000, fontSize: '0.9rem',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          backdropFilter: 'blur(10px)', animation: 'slideUp 0.3s cubic-bezier(0.16,1,0.3,1)',
+          whiteSpace: 'nowrap', maxWidth: '90vw',
         }}>
-          <span>🌿</span> {toastMessage}
+          {toastMessage}
         </div>
       )}
 
-      {/* Main Container */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '40px 0' }}>
-        
-        {/* Navigation / Header */}
-        <header className="container" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '40px'
-        }}>
+
+        {/* Header */}
+        <header className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '2rem' }}>🌿</span>
             <div style={{ textAlign: 'left' }}>
-              <h1 style={{
-                fontFamily: 'var(--font-heading)',
-                fontSize: '1.6rem',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-                letterSpacing: '-0.5px',
-                margin: 0
-              }}>
+              <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', margin: 0 }}>
                 Plant<span style={{ color: 'var(--accent-color)' }}>Guard</span> AI
               </h1>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                Enterprise Disease Detection Portal
-              </p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Enterprise Disease Detection Portal</p>
             </div>
           </div>
 
           {token && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* WebSocket Indicator */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.8rem',
-                backgroundColor: 'var(--bg-secondary)',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)'
-              }}>
+              {/* WS indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', backgroundColor: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <span style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: wsStatus === 'connected' ? 'var(--accent-color)' : wsStatus === 'connecting' ? 'hsl(35, 90%, 55%)' : 'var(--danger-color)',
+                  display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
+                  backgroundColor: wsStatus === 'connected' ? 'var(--accent-color)' : wsStatus === 'connecting' ? 'hsl(35,90%,55%)' : 'var(--danger-color)',
                   boxShadow: wsStatus === 'connected' ? '0 0 8px var(--accent-color)' : 'none',
-                  animation: wsStatus === 'connecting' ? 'pulse 1s infinite alternate' : 'none'
-                }}></span>
+                  animation: wsStatus === 'connecting' ? 'pulse 1s infinite alternate' : 'none',
+                }} />
                 <span style={{ color: 'var(--text-secondary)' }}>
                   {wsStatus === 'connected' ? 'Live Mode' : wsStatus === 'connecting' ? 'Connecting...' : 'Offline'}
                 </span>
               </div>
-
-              {/* User badge */}
               <div style={{ textAlign: 'right' }}>
                 <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name}</p>
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user?.email}</p>
               </div>
-
-              <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={handleLogout}>
-                Sign Out
-              </button>
+              <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={handleLogout}>Sign Out</button>
             </div>
           )}
         </header>
@@ -330,54 +271,21 @@ export default function App() {
         {!token ? (
           <main className="container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="glass-card" style={{ width: '100%', maxWidth: '450px', padding: '40px' }}>
-              
-              {/* Form Tab Selector */}
               <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '30px' }}>
-                <button 
-                  style={{
-                    flex: 1,
-                    background: 'none',
-                    border: 'none',
-                    color: activeTab === 'login' ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    paddingBottom: '12px',
-                    borderBottom: activeTab === 'login' ? '2px solid var(--accent-color)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => { setActiveTab('login'); setAuthError(''); }}
-                >
-                  Sign In
-                </button>
-                <button 
-                  style={{
-                    flex: 1,
-                    background: 'none',
-                    border: 'none',
-                    color: activeTab === 'signup' ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    paddingBottom: '12px',
-                    borderBottom: activeTab === 'signup' ? '2px solid var(--accent-color)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => { setActiveTab('signup'); setAuthError(''); }}
-                >
-                  Register
-                </button>
+                {['login', 'signup'].map(tab => (
+                  <button key={tab} style={{
+                    flex: 1, background: 'none', border: 'none',
+                    color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontSize: '1rem', fontWeight: 600, paddingBottom: '12px', cursor: 'pointer',
+                    borderBottom: activeTab === tab ? '2px solid var(--accent-color)' : 'none',
+                  }} onClick={() => { setActiveTab(tab); setAuthError(''); }}>
+                    {tab === 'login' ? 'Sign In' : 'Register'}
+                  </button>
+                ))}
               </div>
 
               {authError && (
-                <div style={{
-                  backgroundColor: 'var(--danger-bg)',
-                  border: '1px solid var(--danger-border)',
-                  color: 'var(--danger-color)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  marginBottom: '20px',
-                  textAlign: 'left'
-                }}>
+                <div style={{ backgroundColor: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger-color)', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '20px' }}>
                   ⚠️ {authError}
                 </div>
               )}
@@ -387,295 +295,281 @@ export default function App() {
                   <div className="input-group">
                     <label>Full Name</label>
                     <div className="input-wrapper">
-                      <input 
-                        type="text" 
-                        placeholder="John Doe" 
-                        value={name} 
-                        onChange={(e) => setName(e.target.value)} 
-                        required 
-                      />
+                      <input type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required />
                     </div>
                   </div>
                 )}
-
                 <div className="input-group">
                   <label>Email Address</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="email" 
-                      placeholder="you@domain.com" 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)} 
-                      required 
-                    />
+                    <input type="email" placeholder="you@domain.com" value={email} onChange={e => setEmail(e.target.value)} required />
                   </div>
                 </div>
-
                 <div className="input-group">
                   <label>Password</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      value={password} 
-                      onChange={(e) => setPassword(e.target.value)} 
-                      required 
-                    />
+                    <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
                   </div>
                 </div>
-
-                <button 
-                  type="submit" 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', marginTop: '10px' }}
-                  disabled={authLoading}
-                >
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }} disabled={authLoading}>
                   {authLoading ? 'Connecting...' : activeTab === 'login' ? 'Sign In' : 'Create Account'}
                 </button>
               </form>
             </div>
           </main>
+
         ) : (
-          
-          /* Dashboard Screen */
-          <main className="container" style={{
-            flex: 1,
-            display: 'grid',
-            gridTemplateColumns: '1fr 1.2fr',
-            gap: '32px',
-            alignItems: 'start'
-          }}>
-            
-            {/* Left side: Upload / Submit Diagnosis */}
+
+          /* Dashboard */
+          <main className="container" style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '32px', alignItems: 'start' }}>
+
+            {/* Left: Upload Panel */}
             <section className="glass-card" style={{ padding: '32px', textAlign: 'left' }}>
-              <h2 style={{
-                fontFamily: 'var(--font-heading)',
-                fontSize: '1.4rem',
-                fontWeight: 700,
-                marginBottom: '8px'
-              }}>
+              <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px' }}>
                 Analyze Plant Leaf
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '24px' }}>
-                Upload a custom image link or select one of our pre-validated diseased leaf samples below.
+                Upload a clear photo of a plant leaf to detect diseases using AI.
               </p>
 
-              {/* Sample Presets */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
-                  Select Sample Preset
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  {PRESETS.map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => selectPreset(p)}
-                      style={{
-                        padding: '10px 8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        borderRadius: '8px',
-                        border: '1px solid',
-                        borderColor: selectedPreset.id === p.id && !customImageUrl ? 'var(--accent-color)' : 'var(--border-color)',
-                        backgroundColor: selectedPreset.id === p.id && !customImageUrl ? 'var(--accent-soft)' : 'var(--bg-secondary)',
-                        color: selectedPreset.id === p.id && !customImageUrl ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom URL Input */}
-              <div className="input-group">
-                <label>Custom Image URL</label>
-                <div className="input-wrapper">
-                  <input 
-                    type="url" 
-                    placeholder="https://example.com/leaf.jpg"
-                    value={customImageUrl}
-                    onChange={(e) => setCustomImageUrl(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Image Preview */}
-              <div style={{
-                width: '100%',
-                height: '180px',
-                backgroundColor: 'var(--bg-secondary)',
-                borderRadius: '12px',
-                border: '1px solid var(--border-color)',
-                overflow: 'hidden',
-                position: 'relative',
-                marginBottom: '24px'
-              }}>
-                <img 
-                  src={customImageUrl || selectedPreset.url} 
-                  alt="Preview" 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '8px',
-                  right: '8px',
-                  backgroundColor: 'rgba(0,0,0,0.6)',
-                  color: 'white',
-                  fontSize: '0.7rem',
-                  padding: '4px 8px',
-                  borderRadius: '6px'
-                }}>
-                  {customImageUrl ? 'Custom Image' : 'Selected Preset'}
-                </div>
-              </div>
-
-              {/* Location parameters */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="input-group">
-                  <label>Latitude</label>
-                  <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      step="any"
-                      value={latitude}
-                      onChange={(e) => setLatitude(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="input-group">
-                  <label>Longitude</label>
-                  <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      step="any"
-                      value={longitude}
-                      onChange={(e) => setLongitude(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <button 
-                className="btn btn-primary" 
-                style={{ width: '100%', padding: '14px' }}
-                onClick={handleDiagnoseSubmit}
-                disabled={submitLoading}
+              {/* Drop Zone */}
+              <div
+                id="drop-zone"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                style={{
+                  border: `2px dashed ${isDragging ? 'var(--accent-color)' : previewUrl ? 'hsla(142,70%,45%,0.5)' : 'var(--border-color)'}`,
+                  borderRadius: '16px',
+                  minHeight: '200px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: isDragging ? 'var(--accent-soft)' : 'var(--bg-secondary)',
+                  transition: 'all 0.2s',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  marginBottom: '20px',
+                }}
               >
-                {submitLoading ? 'Sending task...' : 'Submit to AI Engine'}
-              </button>
-            </section>
-
-            {/* Right side: Diagnosis History */}
-            <section className="glass-card" style={{ padding: '32px', textAlign: 'left', minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div>
-                  <h2 style={{
-                    fontFamily: 'var(--font-heading)',
-                    fontSize: '1.4rem',
-                    fontWeight: 700
-                  }}>
-                    Diagnosis Log
-                  </h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    Historical logs and pipeline processing tasks.
-                  </p>
-                </div>
-                <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }} onClick={fetchHistory}>
-                  Refresh 🔄
-                </button>
-              </div>
-
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
-                {diagnoseHistory.length === 0 ? (
-                  <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--text-muted)',
-                    gap: '12px',
-                    padding: '40px 0'
-                  }}>
-                    <span style={{ fontSize: '2.5rem' }}>🍃</span>
-                    <p style={{ fontSize: '0.9rem' }}>No diagnoses in database yet.</p>
-                    <p style={{ fontSize: '0.75rem', maxWidth: '250px', textAlign: 'center' }}>Submit an image from the panel to run the clean architecture backend pipeline.</p>
-                  </div>
-                ) : (
-                  diagnoseHistory.map((diag) => (
-                    <div 
-                      key={diag.id} 
-                      style={{
-                        backgroundColor: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '16px',
-                        padding: '16px',
-                        display: 'flex',
-                        gap: '16px',
-                        alignItems: 'center',
-                        transition: 'border-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--border-hover)'}
-                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
-                    >
-                      <img 
-                        src={diag.image_url} 
-                        alt="Diagnosed Leaf" 
-                        style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--border-color)' }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            padding: '4px 10px',
-                            borderRadius: '100px',
-                            backgroundColor: diag.status === 'Completed' ? 'var(--success-bg)' : diag.status === 'Pending' ? 'hsla(35, 90%, 55%, 0.1)' : 'var(--danger-bg)',
-                            color: diag.status === 'Completed' ? 'var(--success-color)' : diag.status === 'Pending' ? 'hsl(35, 90%, 55%)' : 'var(--danger-color)',
-                            border: '1px solid',
-                            borderColor: diag.status === 'Completed' ? 'hsla(142, 70%, 45%, 0.2)' : diag.status === 'Pending' ? 'hsla(35, 90%, 55%, 0.2)' : 'var(--danger-border)'
-                          }}>
-                            {diag.status}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            {new Date(diag.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p style={{
-                          fontSize: '0.85rem',
-                          color: 'var(--text-primary)',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          ID: {diag.id.substring(0, 8)}...
-                        </p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          📍 Lat: {diag.latitude?.toFixed(4) || 'N/A'}, Lon: {diag.longitude?.toFixed(4) || 'N/A'}
-                        </p>
-                      </div>
+                {previewUrl ? (
+                  <>
+                    <img src={previewUrl} alt="Leaf preview" style={{ width: '100%', height: '200px', objectFit: 'cover' }} />
+                    <div style={{
+                      position: 'absolute', bottom: '8px', right: '8px',
+                      backgroundColor: 'rgba(0,0,0,0.6)', color: 'white',
+                      fontSize: '0.7rem', padding: '4px 10px', borderRadius: '6px',
+                    }}>
+                      {uploadedFile?.name}
                     </div>
-                  ))
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '32px 16px', pointerEvents: 'none' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🌿</div>
+                    <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '4px' }}>
+                      Drop leaf image here
+                    </p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      or click to browse · JPEG, PNG · max 10 MB
+                    </p>
+                  </div>
                 )}
               </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+              />
+
+              {/* Change image button when file is loaded */}
+              {previewUrl && (
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: '100%', marginBottom: '12px', fontSize: '0.85rem' }}
+                  onClick={() => { fileInputRef.current?.click(); }}
+                >
+                  🔄 Change Image
+                </button>
+              )}
+
+              <button
+                id="analyze-btn"
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '14px', fontSize: '1rem', opacity: (!uploadedFile || inferLoading) ? 0.7 : 1 }}
+                onClick={handleAnalyze}
+                disabled={!uploadedFile || inferLoading}
+              >
+                {inferLoading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                    <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                    Analyzing with AI...
+                  </span>
+                ) : '🔬 Analyze Disease'}
+              </button>
+
+              {/* Model info note */}
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '12px', textAlign: 'center' }}>
+                Powered by <strong>linkanjarad/mobilenet_v2</strong> · PlantVillage dataset · 38 disease classes
+              </p>
             </section>
+
+            {/* Right: Results + History */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+              {/* AI Results Panel */}
+              {(inferResult || inferError || inferLoading) && (
+                <section className="glass-card" style={{ padding: '28px', textAlign: 'left' }}>
+                  <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', fontWeight: 700, marginBottom: '18px' }}>
+                    🔬 Detection Results
+                  </h2>
+
+                  {inferLoading && (
+                    <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                      <p>Running inference on HuggingFace...</p>
+                      <p style={{ fontSize: '0.8rem', marginTop: '8px' }}>First call may take ~20s if model is cold-starting.</p>
+                    </div>
+                  )}
+
+                  {inferError && !inferLoading && (
+                    <div style={{ backgroundColor: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger-color)', padding: '14px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                      ⚠️ {inferError}
+                    </div>
+                  )}
+
+                  {inferResult && !inferLoading && (
+                    <>
+                      {/* Top Prediction Hero */}
+                      <div style={{
+                        backgroundColor: 'var(--bg-secondary)',
+                        borderRadius: '14px',
+                        padding: '20px',
+                        marginBottom: '20px',
+                        border: '1px solid hsla(142,70%,45%,0.2)',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                          <div>
+                            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Top Match</p>
+                            <p style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
+                              {inferResult.top_prediction?.plant}
+                            </p>
+                            <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              {inferResult.top_prediction?.disease}
+                            </p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <DiseaseTag isHealthy={inferResult.top_prediction?.is_healthy} />
+                            <p style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-color)', marginTop: '8px' }}>
+                              {inferResult.top_prediction?.confidence?.toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                        <ConfidenceBar value={inferResult.top_prediction?.confidence} isTop={true} />
+                      </div>
+
+                      {/* Other Predictions */}
+                      {inferResult.all_predictions?.length > 1 && (
+                        <div>
+                          <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>
+                            Other Possibilities
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {inferResult.all_predictions.slice(1).map(pred => (
+                              <div key={pred.rank} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '16px', textAlign: 'right' }}>#{pred.rank}</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                                      {pred.plant} · {pred.disease}
+                                    </span>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '8px' }}>
+                                      {pred.confidence.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                  <ConfidenceBar value={pred.confidence} isTop={false} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
+
+              {/* Diagnosis History */}
+              <section className="glass-card" style={{ padding: '28px', textAlign: 'left', minHeight: '300px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div>
+                    <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', fontWeight: 700 }}>Diagnosis Log</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Your scan history</p>
+                  </div>
+                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }} onClick={fetchHistory}>Refresh 🔄</button>
+                </div>
+
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {diagnoseHistory.length === 0 ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '10px', padding: '32px 0' }}>
+                      <span style={{ fontSize: '2.5rem' }}>🍃</span>
+                      <p style={{ fontSize: '0.9rem' }}>No scans yet. Upload a leaf image to start.</p>
+                    </div>
+                  ) : (
+                    diagnoseHistory.map(diag => (
+                      <div
+                        key={diag.id}
+                        style={{
+                          backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                          borderRadius: '14px', padding: '14px 16px',
+                          display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                      >
+                        <div>
+                          <p style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                            {diag.species_label ? `${diag.species_label} · ${diag.disease_label}` : `Scan #${diag.id.substring(0, 8)}...`}
+                          </p>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {new Date(diag.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </p>
+                          {diag.confidence > 0 && (
+                            <p style={{ fontSize: '0.75rem', color: 'var(--accent-color)', marginTop: '2px' }}>
+                              {(diag.confidence * 100).toFixed(1)}% confidence
+                            </p>
+                          )}
+                        </div>
+                        <span style={{
+                          alignSelf: 'center', fontSize: '0.72rem', fontWeight: 700,
+                          padding: '4px 10px', borderRadius: '100px',
+                          backgroundColor: diag.status === 'completed' ? 'var(--success-bg)' : diag.status === 'pending' ? 'hsla(35,90%,55%,0.1)' : 'var(--danger-bg)',
+                          color: diag.status === 'completed' ? 'var(--success-color)' : diag.status === 'pending' ? 'hsl(35,90%,55%)' : 'var(--danger-color)',
+                          border: '1px solid',
+                          borderColor: diag.status === 'completed' ? 'hsla(142,70%,45%,0.2)' : diag.status === 'pending' ? 'hsla(35,90%,55%,0.2)' : 'var(--danger-border)',
+                        }}>
+                          {diag.status}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            </div>
+
           </main>
         )}
       </div>
 
-      {/* Global CSS styles injected for custom animations */}
       <style>{`
-        @keyframes pulse {
-          to { opacity: 0.4; }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translate(-50%, 20px); }
-          to { opacity: 1; transform: translate(-50%, 0); }
-        }
+        @keyframes pulse { to { opacity: 0.4; } }
+        @keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </>
   );
