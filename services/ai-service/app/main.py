@@ -61,7 +61,7 @@ def _call_huggingface(image_bytes: bytes) -> list:
             detail="HUGGINGFACE_API_TOKEN is not set. Add it to services/ai-service/.env"
         )
 
-    hf_url = f"https://api-inference.huggingface.co/models/{settings.HF_MODEL_ID}"
+    hf_url = f"https://router.huggingface.co/hf-inference/models/{settings.HF_MODEL_ID}"
     headers = {"Authorization": f"Bearer {settings.HUGGINGFACE_API_TOKEN}"}
 
     try:
@@ -113,14 +113,20 @@ async def infer_huggingface(file: UploadFile = File(...)):
     HuggingFace Inference endpoint.
     Accepts a leaf image, calls the HuggingFace Serverless Inference API,
     and returns top-5 disease predictions with parsed labels and confidence scores.
-
-    Called by the Go core-service when a user uploads an image from the frontend.
     """
-    if file.content_type not in ["image/jpeg", "image/png", "image/jpg", "image/webp"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported image format '{file.content_type}'. Use JPEG or PNG."
-        )
+    # Accept octet-stream too — browsers sometimes send this for drag-dropped files
+    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp", "application/octet-stream"}
+    content_type = (file.content_type or "").lower()
+
+    # If content_type is missing or generic, infer from filename extension
+    if content_type not in {"image/jpeg", "image/png", "image/jpg", "image/webp"}:
+        filename_lower = (file.filename or "").lower()
+        if not any(filename_lower.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
+            if content_type not in ALLOWED_TYPES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported format '{content_type}'. Upload a JPEG or PNG image."
+                )
 
     try:
         image_bytes = await file.read()
