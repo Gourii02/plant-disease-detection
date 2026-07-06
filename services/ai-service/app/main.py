@@ -49,7 +49,7 @@ def _parse_label(raw_label: str) -> dict:
     return {"plant": plant.title(), "disease": disease, "is_healthy": is_healthy}
 
 
-def _call_huggingface(image_bytes: bytes) -> list:
+def _call_huggingface(image_bytes: bytes, content_type: str = "image/jpeg") -> list:
     """
     Send image bytes to the HuggingFace Serverless Inference API.
     Returns a list of { label, score } dicts sorted by score descending.
@@ -62,7 +62,10 @@ def _call_huggingface(image_bytes: bytes) -> list:
         )
 
     hf_url = f"https://router.huggingface.co/hf-inference/models/{settings.HF_MODEL_ID}"
-    headers = {"Authorization": f"Bearer {settings.HUGGINGFACE_API_TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {settings.HUGGINGFACE_API_TOKEN}",
+        "Content-Type": content_type
+    }
 
     try:
         response = http_requests.post(hf_url, headers=headers, data=image_bytes, timeout=30)
@@ -137,7 +140,7 @@ async def infer_huggingface(file: UploadFile = File(...)):
 
         logger.info(f"Received image ({len(image_bytes)} bytes), forwarding to HuggingFace...")
 
-        raw_predictions = _call_huggingface(image_bytes)
+        raw_predictions = _call_huggingface(image_bytes, content_type or "application/octet-stream")
 
         # Enrich top-5 predictions with parsed plant / disease labels
         top_predictions = []
