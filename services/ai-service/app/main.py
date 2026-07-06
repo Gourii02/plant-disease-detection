@@ -38,15 +38,52 @@ triton_client = TritonInferenceClient()
 
 def _parse_label(raw_label: str) -> dict:
     """
-    Convert a PlantVillage label like 'Tomato___Early_blight' into
-    { "plant": "Tomato", "disease": "Early Blight", "is_healthy": false }
+    Convert a HuggingFace plant disease label into plant name and disease details.
+    Examples:
+      - 'Healthy Blueberry Plant' -> { 'plant': 'Blueberry', 'disease': 'Healthy', 'is_healthy': True }
+      - 'Tomato with Bacterial Spot' -> { 'plant': 'Tomato', 'disease': 'Bacterial Spot', 'is_healthy': False }
+      - 'Apple Scab' -> { 'plant': 'Apple', 'disease': 'Scab', 'is_healthy': False }
     """
-    parts = raw_label.split("___")
-    plant = parts[0].replace("_", " ").strip() if parts else "Unknown"
-    disease_raw = parts[1].replace("_", " ").strip() if len(parts) > 1 else "Unknown"
-    is_healthy = "healthy" in disease_raw.lower()
-    disease = "Healthy" if is_healthy else disease_raw.title()
-    return {"plant": plant.title(), "disease": disease, "is_healthy": is_healthy}
+    raw_lower = raw_label.lower()
+    is_healthy = "healthy" in raw_lower
+
+    if is_healthy:
+        # e.g., 'Healthy Blueberry Plant' or 'Healthy Apple'
+        plant = raw_label.replace("Healthy", "").replace("Plant", "").replace("plant", "").strip()
+        disease = "Healthy"
+    else:
+        # e.g., 'Tomato with Bacterial Spot'
+        if " with " in raw_lower:
+            parts = raw_label.split(" with ")
+            plant = parts[0].strip()
+            disease = parts[1].strip()
+        elif raw_lower.startswith("apple "):
+            plant = "Apple"
+            disease = raw_label[6:].strip()
+        elif raw_lower.startswith("cedar apple "):
+            plant = "Apple"
+            disease = "Cedar Apple Rust"
+        elif raw_lower.startswith("cherry "):
+            plant = "Cherry"
+            disease = raw_label[7:].strip()
+        elif raw_lower.startswith("squash "):
+            plant = "Squash"
+            disease = raw_label[7:].strip()
+        elif raw_lower.startswith("strawberry "):
+            plant = "Strawberry"
+            disease = raw_label[11:].strip()
+        elif raw_lower.startswith("tomato "):
+            plant = "Tomato"
+            disease = raw_label[7:].strip()
+        else:
+            plant = raw_label
+            disease = "Infection"
+
+    return {
+        "plant": plant.strip().title(),
+        "disease": disease.strip().title(),
+        "is_healthy": is_healthy
+    }
 
 
 def _call_huggingface(image_bytes: bytes, content_type: str = "image/jpeg") -> list:
