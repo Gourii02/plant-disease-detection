@@ -4,35 +4,35 @@
   --font-heading: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
 
-  /* HSL tailored green-centric dark palette */
-  --bg-primary: hsl(150, 24%, 4%);
-  --bg-secondary: hsl(150, 20%, 6%);
-  --bg-tertiary: hsl(150, 16%, 10%);
-  --bg-glass: hsla(150, 20%, 6%, 0.7);
-  --border-color: hsla(140, 50%, 50%, 0.12);
-  --border-hover: hsla(140, 50%, 50%, 0.25);
+  /* Fresh Sage & Off-White Premium Palette */
+  --bg-primary: hsl(120, 15%, 97%);
+  --bg-card: #ffffff;
+  --bg-secondary: hsl(120, 10%, 93%);
+  --bg-tertiary: hsl(120, 10%, 88%);
   
-  --accent-color: hsl(142, 70%, 45%);
-  --accent-hover: hsl(142, 75%, 55%);
-  --accent-muted: hsla(142, 70%, 45%, 0.15);
-  --accent-soft: hsla(142, 70%, 45%, 0.05);
+  --accent-color: hsl(142, 60%, 35%);
+  --accent-hover: hsl(142, 65%, 28%);
+  --accent-soft: hsla(142, 60%, 35%, 0.08);
 
-  --text-primary: hsl(150, 20%, 96%);
-  --text-secondary: hsl(150, 10%, 75%);
-  --text-muted: hsl(150, 8%, 50%);
-  --text-accent: hsl(142, 70%, 60%);
+  --text-primary: hsl(120, 20%, 15%);
+  --text-secondary: hsl(120, 10%, 40%);
+  --text-muted: hsl(120, 8%, 60%);
 
-  --danger-color: hsl(0, 84%, 60%);
-  --danger-bg: hsla(0, 84%, 60%, 0.1);
-  --danger-border: hsla(0, 84%, 60%, 0.2);
+  --border-color: hsla(120, 15%, 15%, 0.08);
+  --border-hover: hsla(120, 60%, 35%, 0.2);
 
-  --success-color: hsl(142, 70%, 45%);
-  --success-bg: hsla(142, 70%, 45%, 0.1);
+  --danger-color: hsl(0, 74%, 42%);
+  --danger-bg: hsla(0, 74%, 42%, 0.08);
+  --danger-border: hsla(0, 74%, 42%, 0.15);
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
-  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
-  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --success-color: hsl(142, 60%, 35%);
+  --success-bg: hsla(142, 60%, 35%, 0.1);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 12px 36px rgba(120, 140, 120, 0.12);
+  --shadow-lg: 0 20px 50px rgba(120, 140, 120, 0.18);
+  
+  --border-radius: 20px;
 }
 
 * {
@@ -73,43 +73,6 @@ body {
   background: var(--border-hover);
 }
 
-/* Background Gradients & Effects */
-.bg-gradient-effects {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.gradient-orb-1 {
-  position: absolute;
-  top: -10%;
-  left: -10%;
-  width: 50vw;
-  height: 50vw;
-  background: radial-gradient(circle, hsla(142, 70%, 45%, 0.15) 0%, transparent 70%);
-  filter: blur(80px);
-  animation: floatOrb 12s ease-in-out infinite;
-}
-
-.gradient-orb-2 {
-  position: absolute;
-  bottom: -10%;
-  right: -10%;
-  width: 60vw;
-  height: 60vw;
-  background: radial-gradient(circle, hsla(150, 50%, 30%, 0.1) 0%, transparent 60%);
-  filter: blur(100px);
-  animation: floatOrb 15s ease-in-out infinite alternate;
-}
-
-@keyframes floatOrb {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(40px, -30px) scale(1.1); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-
 /* Layout Utilities */
 .container {
   width: 100%;
@@ -138,14 +101,14 @@ button, input {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-color), hsl(142, 60%, 38%));
+  background: linear-gradient(135deg, var(--accent-color), hsl(142, 55%, 30%));
   color: #ffffff;
-  box-shadow: 0 4px 14px hsla(142, 70%, 45%, 0.3);
+  box-shadow: 0 4px 14px hsla(142, 60%, 35%, 0.2);
 }
 
 .btn-primary:hover {
   background: linear-gradient(135deg, var(--accent-hover), var(--accent-color));
-  box-shadow: 0 6px 20px hsla(142, 70%, 45%, 0.45);
+  box-shadow: 0 6px 20px hsla(142, 60%, 35%, 0.3);
   transform: translateY(-2px);
 }
 
@@ -154,13 +117,14 @@ button, input {
 }
 
 .btn-secondary {
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-card);
   border-color: var(--border-color);
   color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary:hover {
-  background-color: hsl(150, 16%, 14%);
+  background-color: var(--bg-secondary);
   border-color: var(--border-hover);
   transform: translateY(-1px);
 }
@@ -209,7 +173,7 @@ button, input {
 .input-wrapper input {
   width: 100%;
   padding: 14px 16px;
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   color: var(--text-primary);
@@ -220,16 +184,20 @@ button, input {
 
 .input-wrapper input:focus {
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px var(--accent-muted);
-  background-color: var(--bg-tertiary);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background-color: var(--bg-card);
 }
 
-/* Glassmorphism Cards */
+/* Glassmorphism/Clean Cards */
 .glass-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 24px;
-  box-shadow: var(--shadow-glass);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-hover);
 }

@@ -8,20 +8,20 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/plant-disease-detection/core-service/internal/usecase"
 )
 
-const aiServiceURL = "http://localhost:8000"
-
 type DiagnosisHandler struct {
-	usecase usecase.DiagnosisUsecase
+	usecase      usecase.DiagnosisUsecase
+	aiServiceURL string
 }
 
-func NewDiagnosisHandler(u usecase.DiagnosisUsecase) *DiagnosisHandler {
-	return &DiagnosisHandler{usecase: u}
+func NewDiagnosisHandler(u usecase.DiagnosisUsecase, aiServiceURL string) *DiagnosisHandler {
+	return &DiagnosisHandler{usecase: u, aiServiceURL: aiServiceURL}
 }
 
 func (h *DiagnosisHandler) Initiate(c *gin.Context) {
@@ -143,13 +143,13 @@ func (h *DiagnosisHandler) UploadAndDiagnose(c *gin.Context) {
 	}
 	writer.Close()
 
-	// Call Python AI service /infer
+	// Call Python AI service /infer — with a 30s timeout to prevent goroutine hangs
+	httpClient := &http.Client{Timeout: 30 * time.Second}
 	req, _ := http.NewRequestWithContext(c.Request.Context(), http.MethodPost,
-		fmt.Sprintf("%s/infer", aiServiceURL), &body)
+		fmt.Sprintf("%s/infer", h.aiServiceURL), &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "AI service is unavailable: " + err.Error()})
 		return

@@ -195,13 +195,27 @@ async def infer_huggingface(file: UploadFile = File(...)):
 
         top = top_predictions[0] if top_predictions else {}
 
-        logger.info(f"Inference complete. Top result: {top.get('plant')} / {top.get('disease')} ({top.get('confidence')}%)")
+        # OOD Guard — if the model is not confident, flag it as an unsupported plant
+        OOD_THRESHOLD = 40.0  # percent
+        is_unsupported = top.get("confidence", 0) < OOD_THRESHOLD
+        warning = None
+        if is_unsupported:
+            warning = (
+                f"Low confidence ({top.get('confidence', 0):.1f}%). "
+                "This plant may not be in the supported crops list. "
+                "Supported crops: Apple, Blueberry, Cherry, Corn, Grape, Orange, "
+                "Peach, Bell Pepper, Potato, Raspberry, Soybean, Squash, Strawberry, Tomato."
+            )
+
+        logger.info(f"Inference complete. Top result: {top.get('plant')} / {top.get('disease')} ({top.get('confidence')}%) — OOD: {is_unsupported}")
 
         return {
             "status": "completed",
             "model": settings.HF_MODEL_ID,
             "top_prediction": top,
             "all_predictions": top_predictions,
+            "is_unsupported_plant": is_unsupported,
+            "warning": warning,
         }
 
     except HTTPException:
