@@ -337,7 +337,9 @@ export default function App() {
   });
 
   // History & realtime
-  const [diagnoseHistory, setDiagnoseHistory] = useState([]);
+  const [diagnoseHistory, setDiagnoseHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('diagnoseHistory') || '[]'); } catch { return []; }
+  });
   const [wsStatus, setWsStatus]     = useState('disconnected');
   const [toastMessage, setToastMessage] = useState('');
   const [searchQuery, setSearchQuery]   = useState('');
@@ -376,7 +378,11 @@ export default function App() {
   const fetchHistory = async () => {
     try {
       const res = await fetch(`${API_BASE}/history`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setDiagnoseHistory((await res.json()) || []);
+      if (res.ok) {
+        const data = (await res.json()) || [];
+        setDiagnoseHistory(data);
+        localStorage.setItem('diagnoseHistory', JSON.stringify(data));
+      }
     } catch { /**/ }
   };
 
@@ -409,8 +415,9 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('token'); localStorage.removeItem('user');
+    localStorage.removeItem('diagnoseHistory'); localStorage.removeItem('savedRemedies');
     setToken(''); setUser(null); setDiagnoseHistory([]);
-    setInferResult(null); setUploadedFile(null); setPreviewUrl(''); setTreatment(null);
+    setInferResult(null); setUploadedFile(null); setPreviewUrl(''); setTreatment(null); setSavedRemedies([]);
   };
 
   const handleSaveProfile = async () => {
@@ -517,7 +524,11 @@ export default function App() {
           status: 'completed',
           created_at: new Date().toISOString()
         };
-        setDiagnoseHistory(prev => [newRecord, ...prev]);
+        setDiagnoseHistory(prev => {
+          const updated = [newRecord, ...prev];
+          localStorage.setItem('diagnoseHistory', JSON.stringify(updated));
+          return updated;
+        });
         showToast('✅ Diagnosis complete (Interactive AI Mode)');
       } else {
         setInferError(err.message);
