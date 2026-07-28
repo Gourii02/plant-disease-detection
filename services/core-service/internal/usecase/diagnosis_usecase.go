@@ -16,12 +16,21 @@ type CreateDiagnosisRequest struct {
 	Longitude *float64 `json:"longitude"`
 }
 
+type VLMResult struct {
+	VLMEnabled       bool    `json:"vlm_enabled"`
+	VLMVerified      bool    `json:"vlm_verified"`
+	OpenSetDiagnosis *string `json:"open_set_diagnosis"`
+	PathogenType     *string `json:"pathogen_type"`
+	VLMNotes         *string `json:"vlm_notes"`
+}
+
 // AIInferenceResult mirrors the JSON shape returned by the Python /infer endpoint.
 type AIInferenceResult struct {
-	Status  string         `json:"status"`
-	Model   string         `json:"model"`
-	TopPred AIPrediction   `json:"top_prediction"`
-	All     []AIPrediction `json:"all_predictions"`
+	Status    string         `json:"status"`
+	Model     string         `json:"model"`
+	TopPred   AIPrediction   `json:"top_prediction"`
+	All       []AIPrediction `json:"all_predictions"`
+	VLMResult *VLMResult     `json:"vlm_result"`
 }
 
 type AIPrediction struct {
