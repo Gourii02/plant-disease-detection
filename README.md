@@ -1,178 +1,171 @@
 # PlantGuard AI — Plant Disease Detection Platform
 
-> An AI-powered platform for identifying plant species and diseases from leaf images, with explainable AI diagnostics, treatment recommendations, and real-time updates.
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
+
+> An enterprise-grade polyglot microservices platform for real-time plant species identification and disease diagnosis using deep learning (HuggingFace Vision Transformers + MobileNetV2), explainable AI (Grad-CAM heatmaps), and Gemini 2.0 Flash VLM verification.
 
 ---
 
-## Tech Stack
+## 🌐 Live Demo & Deployment
 
-| Layer | Technology |
-|:---|:---|
-| **Web Frontend** | React 19, Vite, Vanilla CSS |
-| **Core API** | Go 1.21, Gin, GORM, PostgreSQL |
-| **AI Service** | Python 3.13, FastAPI, PyTorch, Triton Inference Server |
-| **Background Jobs** | Celery, RabbitMQ |
-| **Real-time** | WebSockets (Go) |
-| **Database** | PostgreSQL 15 |
+| Service | Live URL | Hosting Recommendation |
+|:---|:---|:---|
+| **Web Application (React 19)** | [Deploying via Vercel / GitHub Pages](#-deploying-the-web-app) | Vercel / Netlify |
+| **Core Business API (Go)** | `http://localhost:8080` | Render / Railway / AWS EC2 |
+| **AI Inference API (Python)** | `http://localhost:8000` | Render / AWS ECS / Modal |
+
+### 🚀 Deploying the Web App to Vercel (Free 2-Minute Deployment)
+
+1. Go to [Vercel](https://vercel.com/) and click **Add New Project**.
+2. Select repository: `Gourii02/plant-disease-detection`.
+3. Set **Root Directory** to `apps/web-app`.
+4. Framework Preset: **Vite**.
+5. Click **Deploy**. Vercel will automatically build and publish your web app with a live link!
 
 ---
 
-## Repository Structure
+## 🛠️ Architecture & Tech Stack
+
+```
+                                  ┌────────────────────────┐
+                                  │   React 19 Frontend    │
+                                  │      (Vite + CSS)      │
+                                  └───────────┬────────────┘
+                                              │ HTTP / WS
+                                              ▼
+                                  ┌────────────────────────┐
+                                  │   Go Core Service      │
+                                  │ (Gin, GORM, JWT Auth)  │
+                                  └─────┬──────────────┬───┘
+                                        │              │
+                           SQL Queries  │              │ RabbitMQ AMQP
+                                        ▼              ▼
+                              ┌───────────┐      ┌───────────┐
+                              │ PostgreSQL│      │ Celery    │
+                              │  Database │      │ Worker    │
+                              └───────────┘      └─────┬─────┘
+                                                       │ HTTP / gRPC
+                                                       ▼
+                                          ┌────────────────────────┐
+                                          │   Python AI Service    │
+                                          │ (FastAPI + HuggingFace)│
+                                          └────────────────────────┘
+```
+
+| Layer | Technology | Key Capabilities |
+|:---|:---|:---|
+| **Web Client** | React 19, Vite, Vanilla CSS | Real-time WebSocket diagnostics, dashboard analytics, treatment guide |
+| **Core API** | Go 1.21, Gin, GORM, JWT | Auth management, diagnosis history, WebSocket broadcasting |
+| **AI Engine** | Python 3.11+, FastAPI, PyTorch | 38-class plant disease classification, Grad-CAM XAI heatmaps |
+| **VLM Verifier** | Gemini 2.0 Flash Vision API | Open-set out-of-distribution pathogen verification |
+| **Async Pipeline**| Celery, RabbitMQ, Redis | Asynchronous ML batch processing & retry queues |
+| **Database** | PostgreSQL 15 | Relational persistence for users, diagnoses, and treatments |
+
+---
+
+## 📂 Repository Structure
 
 ```
 plant-disease-detection/
 ├── apps/
-│   ├── mobile/             # Mobile client (future — Flutter)
-│   └── web-app/            # Web client (React + Vite, runs on :5173)
+│   └── web-app/            # Production React 19 web application (Vite)
 ├── services/
-│   ├── core-service/       # Go business logic service (:8080)
-│   ├── ai-service/         # Python AI inference service (:8000)
-│   └── api-gateway/        # API gateway (future)
-├── ml/                     # ML model cards, dataset strategy
-├── deployments/            # Deployment documentation
-├── docker-compose.yml      # Local full-stack orchestration
-└── dashboard.html          # Interactive system architecture visualizer
+│   ├── core-service/       # Go core business API & WebSocket hub (:8080)
+│   ├── ai-service/         # Python FastAPI ML inference service (:8000)
+│   └── api-gateway/        # API Gateway documentation & routing specs
+├── ml/                     # ONNX model export scripts & Triton configurations
+├── deployments/            # Infrastructure deployment documentation
+├── docker-compose.yml      # Multi-container orchestration (8 services)
+└── start.ps1               # Automated developer startup script
 ```
 
 ---
 
-## Getting Started
+## 🚦 Quick Start Guide
 
-### Prerequisites
-
-- [Go 1.21+](https://go.dev/dl/)
-- [Python 3.11+](https://www.python.org/downloads/)
-- [Node.js 18+](https://nodejs.org/)
-- [PostgreSQL 15](https://www.postgresql.org/download/)
-
-### 1. Clone the Repository
+### Option 1: Docker Compose (Recommended — Starts All 8 Services)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/plant-disease-detection.git
+git clone https://github.com/Gourii02/plant-disease-detection.git
 cd plant-disease-detection
+docker-compose up --build
 ```
 
-### 2. Configure the Go Core Service
+Access the interfaces:
+- **Web Dashboard**: `http://localhost:3000`
+- **Go API Health**: `http://localhost:8080/api/v1/health`
+- **FastAPI Inference Docs**: `http://localhost:8000/docs`
+- **RabbitMQ Management**: `http://localhost:15672` (guest/guest)
 
+---
+
+### Option 2: Local Manual Startup
+
+#### 1. Start Go Core Service
 ```bash
 cd services/core-service
-
-# Copy the example config and fill in your local values
-cp config.example.yaml config.yaml
-
-# Edit config.yaml — set your DB credentials and JWT secret
-```
-
-### 3. Run the Go Core Service
-
-```bash
-# From services/core-service/
-go mod download
 go run ./cmd/main.go
-# Runs on http://localhost:8080
 ```
 
-### 4. Configure the Python AI Service
-
+#### 2. Start Python AI Service
 ```bash
 cd services/ai-service
-
-# Create a virtual environment
 python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
-
-# Install dependencies
+venv\Scripts\activate      # Windows
 pip install -r requirements.txt
-
-# Copy and configure environment
-cp ../../.env.example .env
+uvicorn app.main:app --port 8000 --reload
 ```
 
-### 5. Run the Python AI Service
-
-```bash
-# From services/ai-service/ with venv active
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-# Runs on http://localhost:8000
-```
-
-### 6. Run the Web Frontend
-
+#### 3. Start React Frontend
 ```bash
 cd apps/web-app
 npm install
 npm run dev
-# Runs on http://localhost:5173
 ```
 
 ---
 
-## API Overview
+## 🧪 Testing
 
-### Authentication
-
-| Method | Endpoint | Description |
-|:---|:---|:---|
-| `POST` | `/api/v1/auth/signup` | Register a new user |
-| `POST` | `/api/v1/auth/login` | Login and receive JWT |
-
-### Diagnosis
-
-| Method | Endpoint | Auth | Description |
-|:---|:---|:---|:---|
-| `POST` | `/api/v1/diagnose` | ✅ | Submit a leaf image URL for AI diagnosis |
-| `GET` | `/api/v1/diagnose/:id` | ✅ | Get a diagnosis result by ID |
-| `GET` | `/api/v1/history` | ✅ | Get the authenticated user's scan history |
-
-### Treatments
-
-| Method | Endpoint | Description |
-|:---|:---|:---|
-| `GET` | `/api/v1/treatments` | List all disease treatment entries |
-| `GET` | `/api/v1/treatments/:key` | Get treatment recommendations for a disease |
-
-### Health
-
-| Method | Endpoint | Description |
-|:---|:---|:---|
-| `GET` | `/api/v1/health` | Service health check including DB status |
-
----
-
-## Development Workflow
-
-This project uses a **feature branch** Git workflow. All development happens on feature branches — never directly on `main`.
-
-```
-main              — production-ready, always stable
-feature/auth      — authentication, JWT refresh, roles
-feature/ui        — React web app development
-feature/backend   — Go core service endpoints and DB
-feature/disease-detection  — AI pipeline, Triton, Celery
-```
-
-### Creating a Feature Branch
+Run backend unit tests for the Go service:
 
 ```bash
-git checkout main
-git pull origin main
-git checkout -b feature/your-feature-name
-# ... do your work ...
-git push -u origin feature/your-feature-name
-# Open a Pull Request on GitHub: feature/your-feature → main
+cd services/core-service
+go test ./internal/usecase/... -v
 ```
 
 ---
 
-## Environment Variables
+## 📡 API Reference
 
-Copy `.env.example` to `.env` for the AI service, and `services/core-service/config.example.yaml` to `config.yaml` for the Go service. See each file for descriptions of required variables.
+### Authentication & Profile
+| Method | Endpoint | Auth | Description |
+|:---|:---|:---|:---|
+| `POST` | `/api/v1/auth/signup` | ❌ | Register user account |
+| `POST` | `/api/v1/auth/login` | ❌ | Authenticate and obtain JWT |
+| `GET` | `/api/v1/users/me` | ✅ | Fetch user profile |
+| `PUT` | `/api/v1/users/me` | ✅ | Update profile details |
 
-> ⚠️ Never commit `config.yaml` or `.env` files with real credentials.
+### Diagnostics & WebSocket
+| Method | Endpoint | Auth | Description |
+|:---|:---|:---|:---|
+| `POST` | `/api/v1/diagnose/upload` | ✅ | Direct leaf image upload & synchronous inference |
+| `POST` | `/api/v1/diagnose` | ✅ | Submit leaf image URL for async Celery task processing |
+| `GET` | `/api/v1/history` | ✅ | Retrieve authenticated user's scan history |
+| `GET` | `/api/v1/ws` | ✅ | Real-time WebSocket connection for live notification updates |
+
+### Treatments & Knowledge Base
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/api/v1/treatments` | List treatments for all 28 supported plant diseases |
+| `GET` | `/api/v1/treatments/:key` | Retrieve specific organic & chemical remedies for a disease |
 
 ---
 
-## License
+## 📜 License
 
-MIT
+Distributed under the MIT License. See `LICENSE` for details.
