@@ -92,6 +92,10 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		private := api.Group("")
 		private.Use(AuthMiddleware(cfg.JWTService))
 		{
+			// User profile routes
+			private.GET("/users/me", cfg.AuthHandler.GetMe)
+			private.PUT("/users/me", cfg.AuthHandler.UpdateMe)
+
 			private.POST("/diagnose", cfg.DiagnosisHandler.Initiate)
 			private.POST("/diagnose/upload", cfg.DiagnosisHandler.UploadAndDiagnose)
 			private.GET("/diagnose/:id", cfg.DiagnosisHandler.GetByID)
