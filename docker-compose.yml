@@ -1,6 +1,8 @@
 version: '3.8'
 
 services:
+  # ─── Infrastructure ───────────────────────────────────────────────────────────
+
   db:
     image: postgres:15-alpine
     container_name: plant-disease-db
@@ -25,13 +27,43 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: plant-disease-mq
     ports:
       - "5672:5672"
-      - "15672:15672" # Management portal interface
+      - "15672:15672"   # Management UI: http://localhost:15672 (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ─── ML Inference ─────────────────────────────────────────────────────────────
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:23.10-py3-min
+    container_name: plant-triton
+    command: tritonserver --model-repository=/models --strict-model-config=false
+    ports:
+      - "8001:8001"   # gRPC inference
+      - "8002:8002"   # HTTP metrics
+    volumes:
+      - ./ml/model_repository:/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ─── Application Services ─────────────────────────────────────────────────────
 
   core-service:
     build:
@@ -47,14 +79,20 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=plant_disease_db
+      - DB_SSLMODE=disable
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=development_secret_signing_key_keep_it_secure_1298408124
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=${JWT_SECRET:-development_secret_signing_key_change_in_prod}
+      - JWT_EXPIRY_MINUTES=${JWT_EXPIRY_MINUTES:-60}
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   ai-service:
     build:
@@ -66,21 +104,53 @@ services:
     environment:
       - API_PORT=8000
       - TRITON_SERVER_URL=triton:8001
+      - MODEL_NAME=plant_disease_model
+      - MODEL_VERSION=1
+      - IMAGE_SIZE=224
+      - RABBITMQ_BROKER_URL=pyamqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CORE_SERVICE_INTERNAL_URL=http://core-service:8080
+      - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN:-}
+      - HF_MODEL_ID=${HF_MODEL_ID:-linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification}
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   celery-worker:
     build:
       context: ./services/ai-service
       dockerfile: Dockerfile
     container_name: plant-celery-worker
-    entrypoint: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=info"]
+    entrypoint: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=info", "-Q", "diagnosis_jobs"]
     environment:
-      - RABBITMQ_BROKER_URL=pyamqp://guest:guest@rabbitmq:5672//
       - TRITON_SERVER_URL=triton:8001
+      - MODEL_NAME=plant_disease_model
+      - MODEL_VERSION=1
+      - IMAGE_SIZE=224
+      - RABBITMQ_BROKER_URL=pyamqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CORE_SERVICE_INTERNAL_URL=http://core-service:8080
+      - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN:-}
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web-app:
+    build:
+      context: ./apps/web-app
+      dockerfile: Dockerfile
+    container_name: plant-web-app
+    ports:
+      - "3000:80"
+    depends_on:
+      - core-service
+      - ai-service
 
 volumes:
   pgdata:
   redisdata:
+

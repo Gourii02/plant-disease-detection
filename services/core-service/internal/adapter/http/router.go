@@ -13,8 +13,10 @@ type RouterConfig struct {
 	AuthHandler      *AuthHandler
 	TreatmentHandler *TreatmentHandler
 	DiagnosisHandler *DiagnosisHandler
+	InternalHandler  *InternalHandler
 	JWTService       auth.JWTService
 	WsHub            *WsHub
+	AIServiceURL     string
 }
 
 func SetupRouter(cfg RouterConfig) *gin.Engine {
@@ -90,7 +92,12 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		private := api.Group("")
 		private.Use(AuthMiddleware(cfg.JWTService))
 		{
+			// User profile routes
+			private.GET("/users/me", cfg.AuthHandler.GetMe)
+			private.PUT("/users/me", cfg.AuthHandler.UpdateMe)
+
 			private.POST("/diagnose", cfg.DiagnosisHandler.Initiate)
+			private.POST("/diagnose/upload", cfg.DiagnosisHandler.UploadAndDiagnose)
 			private.GET("/diagnose/:id", cfg.DiagnosisHandler.GetByID)
 			private.GET("/history", cfg.DiagnosisHandler.GetHistory)
 			
@@ -103,5 +110,12 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		}
 	}
 
+	// Internal service-to-service routes (no JWT — protected by Docker internal network only)
+	internal := r.Group("/internal")
+	{
+		internal.POST("/diagnose/complete", cfg.InternalHandler.CompleteDiagnosis)
+	}
+
 	return r
 }
+

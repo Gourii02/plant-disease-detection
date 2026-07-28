@@ -11,6 +11,7 @@ import (
 )
 
 type RegisterRequest struct {
+	Name     string `json:"name"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 }
@@ -18,6 +19,11 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
+}
+
+type UpdateProfileRequest struct {
+	Name  string `json:"name"`
+	Email string `json:"email" binding:"omitempty,email"`
 }
 
 type AuthResponse struct {
@@ -28,6 +34,8 @@ type AuthResponse struct {
 type AuthUsecase interface {
 	Register(ctx context.Context, req RegisterRequest) (*AuthResponse, error)
 	Login(ctx context.Context, req LoginRequest) (*AuthResponse, error)
+	GetMe(ctx context.Context, userID uint) (*domain.User, error)
+	UpdateMe(ctx context.Context, userID uint, req UpdateProfileRequest) (*domain.User, error)
 }
 
 type authUsecase struct {
@@ -59,6 +67,7 @@ func (u *authUsecase) Register(ctx context.Context, req RegisterRequest) (*AuthR
 	}
 
 	newUser := &domain.User{
+		Name:         req.Name,
 		Email:        req.Email,
 		PasswordHash: string(hashed),
 		CreatedAt:    time.Now(),
@@ -103,4 +112,46 @@ func (u *authUsecase) Login(ctx context.Context, req LoginRequest) (*AuthRespons
 		Token: token,
 		User:  *user,
 	}, nil
+}
+
+func (u *authUsecase) GetMe(ctx context.Context, userID uint) (*domain.User, error) {
+	user, err := u.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+	return user, nil
+}
+
+func (u *authUsecase) UpdateMe(ctx context.Context, userID uint, req UpdateProfileRequest) (*domain.User, error) {
+	user, err := u.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+
+	if req.Name != "" {
+		user.Name = req.Name
+	}
+	if req.Email != "" && req.Email != user.Email {
+		// Check if new email is already taken by another user
+		existing, err := u.userRepo.GetByEmail(ctx, req.Email)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil && existing.ID != user.ID {
+			return nil, errors.New("email address is already in use by another account")
+		}
+		user.Email = req.Email
+	}
+
+	if err := u.userRepo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }

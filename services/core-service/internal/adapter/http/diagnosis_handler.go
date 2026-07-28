@@ -1,8 +1,14 @@
 package http
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,11 +16,12 @@ import (
 )
 
 type DiagnosisHandler struct {
-	usecase usecase.DiagnosisUsecase
+	usecase      usecase.DiagnosisUsecase
+	aiServiceURL string
 }
 
-func NewDiagnosisHandler(u usecase.DiagnosisUsecase) *DiagnosisHandler {
-	return &DiagnosisHandler{usecase: u}
+func NewDiagnosisHandler(u usecase.DiagnosisUsecase, aiServiceURL string) *DiagnosisHandler {
+	return &DiagnosisHandler{usecase: u, aiServiceURL: aiServiceURL}
 }
 
 func (h *DiagnosisHandler) Initiate(c *gin.Context) {
@@ -95,4 +102,91 @@ func (h *DiagnosisHandler) GetHistory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, diags)
+}
+
+// UploadAndDiagnose accepts a multipart image file, forwards it to the Python
+// AI service /infer endpoint, saves the diagnosis result to the database,
+// and returns the full prediction payload to the client.
+func (h *DiagnosisHandler) UploadAndDiagnose(c *gin.Context) {
+	val, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized context"})
+		return
+	}
+	userID := val.(uint)
+
+	// Parse image from multipart form (field name: "image")
+	file, header, err := c.Request.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image file is required (field name: image)"})
+		return
+	}
+	defer file.Close()
+
+	imageBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read uploaded file"})
+		return
+	}
+
+	// Build multipart request to forward to Python AI service
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", header.Filename)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create multipart request"})
+		return
+	}
+	if _, err = part.Write(imageBytes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to write image to multipart"})
+		return
+	}
+	writer.Close()
+
+	// Call Python AI service /infer — with a 30s timeout to prevent goroutine hangs
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	req, _ := http.NewRequestWithContext(c.Request.Context(), http.MethodPost,
+		fmt.Sprintf("%s/infer", h.aiServiceURL), &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "AI service is unavailable: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		var aiErr map[string]interface{}
+		_ = json.Unmarshal(respBody, &aiErr)
+		c.JSON(resp.StatusCode, gin.H{
+			"error":  "AI inference failed",
+			"detail": aiErr,
+		})
+		return
+	}
+
+	// Decode AI response
+	var aiResult usecase.AIInferenceResult
+	if err := json.Unmarshal(respBody, &aiResult); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse AI service response"})
+		return
+	}
+
+	// Persist to database via usecase
+	diag, err := h.usecase.DiagnoseFromUpload(c.Request.Context(), userID, usecase.UploadDiagnosisRequest{
+		Filename: header.Filename,
+		AIResult: aiResult,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"diagnosis": diag,
+		"ai_result": aiResult,
+	})
 }
