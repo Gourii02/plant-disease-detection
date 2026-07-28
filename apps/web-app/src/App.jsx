@@ -447,8 +447,8 @@ export default function App() {
         <nav className="fixed top-0 left-0 right-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/20 shadow-sm">
           <div className="flex justify-between items-center px-8 py-4 max-w-7xl mx-auto">
             <div className="flex items-center gap-3">
-              <img alt="FloraPulse AI Logo" className="w-8 h-8 rounded-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUnGGM1aRGdgrIlCAoCjWhUUjMSeHKJ6UDGChyfh33HdXcl0trlHHTIAQffgOYy5tTkEJKaINfH_OceNgDo0UbVaTnUi1SaUIA9pDYc5uZS-dTMPlyrwkYRE7Lo8B8tRtkIjZGpmObKWwqC1xuqk9GpMvZ1nM41CIqdmaxTHN0noAWa3EzqRZVWNpVjTTrkUj68lpSLPQbvO6gnIQaFXmGK8-d6aLv3cRQGffmod_s1XX9AA7qGtELNtqGmNChvx55Sxuq-Bae2K_2" />
-              <span className="text-2xl font-bold text-primary tracking-tight">FloraPulse AI</span>
+              <img alt="PlantGuard AI Logo" className="w-8 h-8 rounded-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUnGGM1aRGdgrIlCAoCjWhUUjMSeHKJ6UDGChyfh33HdXcl0trlHHTIAQffgOYy5tTkEJKaINfH_OceNgDo0UbVaTnUi1SaUIA9pDYc5uZS-dTMPlyrwkYRE7Lo8B8tRtkIjZGpmObKWwqC1xuqk9GpMvZ1nM41CIqdmaxTHN0noAWa3EzqRZVWNpVjTTrkUj68lpSLPQbvO6gnIQaFXmGK8-d6aLv3cRQGffmod_s1XX9AA7qGtELNtqGmNChvx55Sxuq-Bae2K_2" />
+              <span className="text-2xl font-bold text-primary tracking-tight">PlantGuard AI</span>
             </div>
             <div className="hidden md:flex items-center gap-8">
               <a className="text-primary font-bold border-b-2 border-primary pb-1 text-sm cursor-pointer" onClick={(e) => scrollToSection(e, 'hero')}>Features</a>
@@ -490,7 +490,7 @@ export default function App() {
               <div className="aspect-video relative overflow-hidden">
                 <img
                   className="w-full h-full object-cover"
-                  alt="FloraPulse AI tomato leaf infection mockup"
+                  alt="PlantGuard AI tomato leaf infection mockup"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzlCEp_sMHKCt92WPCnNTZPsvsEfqwXRcfg6D04t-Z9idGEuvMhRyTuZHKGwBCMGaAs5cLX6SrQZOOqzB4iJxbKq58gjHiWGh8WHVbGTdngIbCc3QCKqzpI8QhNenLyn9tDcvdxxxZLkdt0eMHfFrIpwmaVY91oSs4iydGSKXry6D2PjQ30nnCV07lLml1-M2csgYbRguu8KLRyENVc0KFGFCG3i_UHPei_XuoKyu-9xOfWk3tUbCp6DYJVTGbyHdaBzNtrt3xiyiO"
                 />
 
@@ -640,7 +640,7 @@ export default function App() {
               <div className="max-w-xl text-center md:text-left">
                 <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Start protecting your plants today</h2>
                 <p className="text-on-surface-variant text-base">
-                  Join 15,000+ agronomists using FloraPulse to monitor crop health with AI precision.
+                  Join 15,000+ agronomists using PlantGuard to monitor crop health with AI precision.
                 </p>
               </div>
               <div className="w-full max-w-md bg-surface p-8 rounded-2xl border border-slate-800 shadow-xl text-left">
@@ -692,8 +692,8 @@ export default function App() {
         <footer className="w-full py-12 border-t border-outline-variant/10 bg-surface-container-lowest">
           <div className="flex flex-col md:flex-row justify-between items-center px-8 max-w-7xl mx-auto gap-4">
             <div className="flex items-center gap-3">
-              <img alt="FloraPulse AI Logo" className="w-6 h-6 rounded-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUnGGM1aRGdgrIlCAoCjWhUUjMSeHKJ6UDGChyfh33HdXcl0trlHHTIAQffgOYy5tTkEJKaINfH_OceNgDo0UbVaTnUi1SaUIA9pDYc5uZS-dTMPlyrwkYRE7Lo8B8tRtkIjZGpmObKWwqC1xuqk9GpMvZ1nM41CIqdmaxTHN0noAWa3EzqRZVWNpVjTTrkUj68lpSLPQbvO6gnIQaFXmGK8-d6aLv3cRQGffmod_s1XX9AA7qGtELNtqGmNChvx55Sxuq-Bae2K_2" />
-              <span className="font-bold text-primary text-sm">FloraPulse AI</span>
+              <img alt="PlantGuard AI Logo" className="w-6 h-6 rounded-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUnGGM1aRGdgrIlCAoCjWhUUjMSeHKJ6UDGChyfh33HdXcl0trlHHTIAQffgOYy5tTkEJKaINfH_OceNgDo0UbVaTnUi1SaUIA9pDYc5uZS-dTMPlyrwkYRE7Lo8B8tRtkIjZGpmObKWwqC1xuqk9GpMvZ1nM41CIqdmaxTHN0noAWa3EzqRZVWNpVjTTrkUj68lpSLPQbvO6gnIQaFXmGK8-d6aLv3cRQGffmod_s1XX9AA7qGtELNtqGmNChvx55Sxuq-Bae2K_2" />
+              <span className="font-bold text-primary text-sm">PlantGuard AI</span>
             </div>
             <div className="flex gap-8">
               <a className="text-on-surface-variant text-xs hover:text-primary transition-colors" href="#">Privacy</a>
@@ -701,7 +701,7 @@ export default function App() {
               <a className="text-on-surface-variant text-xs hover:text-primary transition-colors" href="#">API</a>
             </div>
             <div className="text-on-surface-variant text-xs opacity-80">
-              © 2026 FloraPulse AI. Precision Agronomy.
+              © 2026 PlantGuard AI. Precision Agronomy.
             </div>
           </div>
         </footer>
@@ -719,7 +719,7 @@ export default function App() {
                     <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
                   </div>
                   <div>
-                    <h1 className="text-xl font-bold text-primary tracking-tight leading-none">FloraPulse AI</h1>
+                    <h1 className="text-xl font-bold text-primary tracking-tight leading-none">PlantGuard AI</h1>
                     <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest mt-1">AI Plant Diagnostics</p>
                   </div>
                 </div>
@@ -802,7 +802,7 @@ export default function App() {
             <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
           </div>
           <div>
-            <p className="text-lg font-bold text-primary tracking-tight leading-none">FloraPulse AI</p>
+            <p className="text-lg font-bold text-primary tracking-tight leading-none">PlantGuard AI</p>
             <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-widest mt-0.5">AI Plant Diagnostics</p>
           </div>
         </div>

@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // FloraPulse AI Design System — Stitch
+        // PlantGuard AI Design System — Stitch
         primary: "#4edea3",
         "primary-dim": "#4edea3",
         "primary-fixed": "#6ffbbe",
