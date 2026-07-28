@@ -12,9 +12,9 @@
 
 ## 🌐 Live Demo & Deployment
 
-| Service | Live URL | Hosting Recommendation |
+| Service | Live URL | Hosting |
 |:---|:---|:---|
-| **Web Application (React 19)** | [Deploying via Vercel / GitHub Pages](#-deploying-the-web-app) | Vercel / Netlify |
+| **Web Application (React 19)** | [**🚀 Launch Live Web App**](https://plant-disease-detection-three-sand.vercel.app/) | Vercel |
 | **Core Business API (Go)** | `http://localhost:8080` | Render / Railway / AWS EC2 |
 | **AI Inference API (Python)** | `http://localhost:8000` | Render / AWS ECS / Modal |
 
