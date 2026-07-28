@@ -139,3 +139,4 @@ services/core-service/*.exe
 
 # OS — Windows specific
 $RECYCLE.BIN/
+*.onnx.data
