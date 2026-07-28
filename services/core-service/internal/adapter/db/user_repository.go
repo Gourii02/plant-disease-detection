@@ -20,6 +20,10 @@ func (r *userRepo) Create(ctx context.Context, user *domain.User) error {
 	return r.db.WithContext(ctx).Create(user).Error
 }
 
+func (r *userRepo) Update(ctx context.Context, user *domain.User) error {
+	return r.db.WithContext(ctx).Save(user).Error
+}
+
 func (r *userRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var user domain.User
 	err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
