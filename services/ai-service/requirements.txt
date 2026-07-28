@@ -4,6 +4,7 @@ pydantic>=2.0.0
 opencv-python-headless>=4.7.0.72
 numpy>=1.24.3
 torch>=2.0.0
+Pillow>=10.0.0
 tritonclient[grpc]>=2.35.0
 python-multipart>=0.0.6
 celery>=5.3.0

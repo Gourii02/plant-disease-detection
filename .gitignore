@@ -124,5 +124,18 @@ services/core-service/config.yaml
 *.local.yaml
 *.secret.yaml
 
+# Environment variable files (NEVER commit secrets)
+# .env.example files are safe and should be committed
+.env
+.env.local
+.env.production
+.env.*.local
+services/**/.env
+apps/**/.env
+
+# Go build artifacts
+services/core-service/core-service
+services/core-service/*.exe
+
 # OS — Windows specific
 $RECYCLE.BIN/

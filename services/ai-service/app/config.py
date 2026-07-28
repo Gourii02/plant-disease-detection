@@ -14,12 +14,16 @@ class Settings:
     MODEL_NAME: str = os.getenv("MODEL_NAME", "plant_disease_model")
     MODEL_VERSION: str = os.getenv("MODEL_VERSION", "1")
     IMAGE_SIZE: int = int(os.getenv("IMAGE_SIZE", 224))
-    # HuggingFace Serverless Inference API
+    # HuggingFace Serverless Inference API (legacy / fallback)
     HUGGINGFACE_API_TOKEN: str = os.getenv("HUGGINGFACE_API_TOKEN", "")
     HF_MODEL_ID: str = os.getenv(
         "HF_MODEL_ID",
         "linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification"
     )
+    # Local Swin Transformer model — loaded at startup via transformers pipeline
+    LOCAL_MODEL_ID: str = os.getenv("LOCAL_MODEL_ID", "plantdoctor/swin-tiny-patch4-window7-224-plant-doctor")
+    # Multimodal Vision-Language Model (VLM) for Open-Set Diseases
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
     # Celery / RabbitMQ
     RABBITMQ_BROKER_URL: str = os.getenv("RABBITMQ_BROKER_URL", "pyamqp://guest:guest@localhost:5672//")
     CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
