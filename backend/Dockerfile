@@ -103,11 +103,13 @@ RUN pip install --no-cache-dir \
 # When we run the container, that cache directory is already present inside
 # the image, so the pipeline loads from disk instantly.
 RUN python -c "\
-from transformers import pipeline; \
+from transformers import MobileNetV2ImageProcessor, pipeline; \
 print('Downloading model — this runs once at build time...'); \
+processor = MobileNetV2ImageProcessor.from_pretrained('linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification'); \
 pipe = pipeline( \
     'image-classification', \
-    model='linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification' \
+    model='linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification', \
+    image_processor=processor \
 ); \
 print('Model downloaded and cached successfully.')"
 
