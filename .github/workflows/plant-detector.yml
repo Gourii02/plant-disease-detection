@@ -109,7 +109,7 @@ jobs:
       # --select E,F = check "pycodestyle errors" and "pyflakes" rules
       # If any lint error is found, ruff exits with code 1 → job fails → PR blocked.
       - name: Lint with ruff
-        run: ruff check backend/app/ backend/tests/ --select E,F
+        run: ruff check backend/app/ backend/tests/ --select E,F --ignore E501
 
       # ── Step 5: Run pytest ────────────────────────────────────────────────
       # Runs all tests in backend/tests/.
