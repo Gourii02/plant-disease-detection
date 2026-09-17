@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global resets ────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Confidence bar animation ─────────────────────────────────── */
+/*
+  The confidence bar uses a CSS custom property (--bar-width) that is set
+  dynamically from JSX via style={{ '--bar-width': `${confidence}%` }}.
+  The Tailwind animation `animate-fill-bar` runs the @keyframes fillBar
+  defined in tailwind.config.js, which animates width from 0% to --bar-width.
+*/
+.confidence-bar {
+  animation: fillBar 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fillBar {
+  from { width: 0%; }
+  to   { width: var(--bar-width, 0%); }
+}
+
+/* ── Drag-over highlight ──────────────────────────────────────── */
+.drop-zone-active {
+  background: rgba(74, 222, 128, 0.08);
+  border-color: rgb(74, 222, 128);
+}
+
+/* ── Custom scrollbar (webkit) ────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}

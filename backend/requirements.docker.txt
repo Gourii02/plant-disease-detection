@@ -1,0 +1,13 @@
+# requirements.docker.txt — Used by the Dockerfile ONLY.
+#
+# Uses CPU-only torch/torchvision to halve the Docker image size.
+# Render has no GPU so this is identical in behaviour but ~half the size.
+
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+transformers>=4.47.0
+torch>=2.6.0+cpu
+torchvision>=0.20.0+cpu
+Pillow==10.4.0
+# pytest/ruff not needed at runtime — excluded to keep image lean

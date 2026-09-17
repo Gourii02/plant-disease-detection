@@ -1,0 +1,36 @@
+# .dockerignore — tells Docker which files to SKIP when building.
+#
+# Works exactly like .gitignore but for Docker builds.
+# Docker copies everything in the build context (the backend/ folder)
+# into the build environment. We exclude files we don't need to keep
+# the build fast and the image clean.
+
+# Virtual environment — huge, not needed (Docker installs deps fresh)
+venv/
+.venv/
+
+# Python cache files — auto-generated, not needed
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test files — not needed at runtime in the container
+tests/
+
+# Dev tools config — not needed at runtime
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+
+# Docker build artifacts from previous runs
+*.log
+
+# IDE config
+.vscode/
+.idea/
+
+# Local env files
+.env
+.env.local

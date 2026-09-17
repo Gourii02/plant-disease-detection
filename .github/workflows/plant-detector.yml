@@ -1,0 +1,208 @@
+# ════════════════════════════════════════════════════════════════════════════
+# .github/workflows/plant-detector.yml
+# ════════════════════════════════════════════════════════════════════════════
+#
+# CONCEPT: What is GitHub Actions?
+#   GitHub Actions is a built-in automation system inside GitHub.
+#   You write a "workflow" file (this YAML file) that describes a recipe:
+#   "when X happens, do Y, then Z".
+#
+#   GitHub runs your recipe on free virtual machines called "runners"
+#   (think: a fresh Ubuntu laptop in the cloud that GitHub lends you).
+#   These runners run your steps, report success/failure, and then vanish.
+#
+# CONCEPT: What is a YAML file?
+#   YAML is a format for writing structured data using indentation.
+#   Two spaces = one level of nesting. Colons separate keys from values.
+#   Lines starting with # are comments (ignored by the runner).
+#
+# CONCEPT: What is GHCR?
+#   GitHub Container Registry — a place to store Docker images, hosted by
+#   GitHub. Free for public repositories. Tightly integrated with your
+#   GitHub account (same username, same tokens).
+#   Images live at: ghcr.io/<github-username>/<image-name>
+#
+# WHAT THIS FILE DOES:
+#   On every push or pull request to `main`:
+#     Job 1 (test): Install deps → lint with ruff → run pytest
+#     Job 2 (build-and-push): ONLY if Job 1 passed AND we're on main branch:
+#       Build the Docker image → push it to GHCR
+# ════════════════════════════════════════════════════════════════════════════
+
+
+# The name shown in the GitHub "Actions" tab for this workflow
+name: Plant Detector CI/CD
+
+
+# ── TRIGGERS ────────────────────────────────────────────────────────────────
+# `on:` defines WHEN this workflow runs.
+#
+# push → branches: [main]
+#   Runs whenever you push commits directly to the main branch.
+#
+# pull_request → branches: [main]
+#   Runs whenever you open or update a pull request targeting main.
+#   This lets you check that a branch passes tests BEFORE merging.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+
+# ── JOBS ─────────────────────────────────────────────────────────────────────
+# `jobs:` is a list of independent (or ordered) groups of steps.
+# By default, jobs run in parallel. We use `needs:` to enforce order.
+jobs:
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # JOB 1: test
+  # Runs on every push AND every pull request (before merging).
+  # Never skipped — tests are always the gate.
+  # ══════════════════════════════════════════════════════════════════════════
+  test:
+    # `runs-on:` picks the type of runner machine GitHub provides for free.
+    # ubuntu-latest = the most recent stable Ubuntu LTS. 2-core CPU, 7GB RAM.
+    runs-on: ubuntu-latest
+
+    # `steps:` is the ordered list of commands this job runs.
+    steps:
+
+      # ── Step 1: Check out the code ──────────────────────────────────────
+      # `uses:` runs a pre-built Action (reusable script) from GitHub's marketplace.
+      # actions/checkout@v4 downloads your repository files onto the runner.
+      # Without this, the runner starts with an empty disk — no code at all.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Step 2: Install Python 3.11 ─────────────────────────────────────
+      # actions/setup-python@v5 installs Python on the runner and adds it to PATH.
+      #
+      # cache: "pip"
+      #   GitHub caches pip's downloaded package files between runs.
+      #   If requirements.txt hasn't changed, packages are restored from cache
+      #   instead of re-downloading from PyPI. Saves ~2–3 minutes per run.
+      #
+      # cache-dependency-path: tells the cache which file to watch.
+      #   If this file changes, the cache is invalidated and packages re-download.
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "backend/requirements.txt"
+
+      # ── Step 3: Install Python dependencies ──────────────────────────────
+      # `run:` executes a shell command on the runner.
+      # This installs fastapi, pytest, ruff, transformers, torch, etc.
+      #
+      # NOTE: We use requirements.txt (not requirements.docker.txt) here.
+      # The runner DOES need pytest and ruff (excluded from Docker image).
+      # The runner downloads full torch (~800MB). GitHub's cache makes this
+      # fast after the first run.
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      # ── Step 4: Lint with ruff ────────────────────────────────────────────
+      # ruff is an extremely fast Python linter (written in Rust).
+      # It checks for syntax errors, undefined names, unused imports, etc.
+      # --select E,F = check "pycodestyle errors" and "pyflakes" rules
+      # If any lint error is found, ruff exits with code 1 → job fails → PR blocked.
+      - name: Lint with ruff
+        run: ruff check backend/app/ backend/tests/ --select E,F
+
+      # ── Step 5: Run pytest ────────────────────────────────────────────────
+      # Runs all tests in backend/tests/.
+      #
+      # IMPORTANT: The tests mock the HuggingFace model (via unittest.mock.patch)
+      # so the runner does NOT download the 14MB model or need a GPU.
+      # The mock returns a fake prediction — we test our logic, not the model.
+      #
+      # `working-directory:` changes the shell's current directory for this step.
+      # We need this because our app imports `from app.main import app` —
+      # Python needs to find the `app` package, which is at backend/app/.
+      - name: Run pytest
+        working-directory: backend
+        run: pytest tests/ -v
+
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # JOB 2: build-and-push
+  # Builds the Docker image and pushes it to GHCR.
+  #
+  # ONLY runs when:
+  #   (a) Job 1 (test) succeeded — `needs: test`
+  #   (b) This is a push to main (not a pull request) — `if:` condition
+  #
+  # We skip this on pull requests because:
+  #   - PRs might come from forks (security risk with secrets)
+  #   - We only want to ship a new image from tested, merged code
+  # ══════════════════════════════════════════════════════════════════════════
+  build-and-push:
+    # This job waits for the `test` job to complete before it starts.
+    # If `test` fails, this job is automatically skipped.
+    needs: test
+
+    # `if:` is a conditional expression. This job only runs on pushes to main.
+    # `github.ref`        = the full git ref of the event (e.g. "refs/heads/main")
+    # `github.event_name` = "push" for pushes, "pull_request" for PRs
+    # Both conditions must be true (&&).
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    runs-on: ubuntu-latest
+
+    # ── Permissions ────────────────────────────────────────────────────────
+    # By default, jobs have read-only access to the repo.
+    # `packages: write` grants permission to push Docker images to GHCR.
+    # `contents: read` grants permission to checkout the code (good practice
+    # to be explicit rather than relying on defaults).
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      # ── Step 1: Check out the code ──────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Step 2: Log in to GitHub Container Registry ─────────────────────
+      # Before we can push a Docker image, we need to authenticate with GHCR.
+      #
+      # docker/login-action@v3 handles the `docker login` command for us.
+      #
+      # registry: ghcr.io       → use GHCR (not Docker Hub)
+      # username: github.actor  → your GitHub username (set automatically)
+      # password: GITHUB_TOKEN  → a temporary secret token GitHub creates
+      #   automatically for every workflow run. You do NOT need to create this.
+      #   It has exactly the permissions declared in the `permissions:` block above.
+      #   It expires when the job finishes. No manual setup needed.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Step 3: Build and push the Docker image ──────────────────────────
+      # docker/build-push-action@v5 runs `docker build` then `docker push`.
+      #
+      # context: ./backend
+      #   The "build context" = the folder Docker sends to the build engine.
+      #   Our Dockerfile is inside backend/, so we point context there.
+      #   This is why all COPY paths in the Dockerfile are relative to backend/.
+      #
+      # push: true
+      #   Actually push to GHCR after building.
+      #   (You can set this to false to build without pushing — useful for testing.)
+      #
+      # tags: the full image name+tag to push to.
+      #   github.repository_owner = your GitHub username (e.g. "gourii02")
+      #   :latest = the tag name. GHCR and Render look for this tag by default.
+      #   Full example: ghcr.io/gourii02/plant-detector-backend:latest
+      - name: Build and push Docker image to GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/plant-detector-backend:latest
